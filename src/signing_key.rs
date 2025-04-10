@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-use curve25519_dalek::{constants, scalar::Scalar};
+use curve25519_dalek::{constants::ED25519_BASEPOINT_TABLE, digest::Update, scalar::Scalar};
 use rand_core::{CryptoRng, RngCore};
 use sha2::{Digest, Sha512};
 
@@ -42,9 +42,9 @@ impl SigningKey {
 impl core::fmt::Debug for SigningKey {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
         fmt.debug_struct("SigningKey")
-            .field("seed", &hex::encode(&self.seed))
+            .field("seed", &hex::encode(self.seed))
             .field("s", &self.s)
-            .field("prefix", &hex::encode(&self.prefix))
+            .field("prefix", &hex::encode(self.prefix))
             .field("vk", &self.vk)
             .finish()
     }
@@ -100,7 +100,7 @@ impl From<[u8; 32]> for SigningKey {
             scalar_bytes[0] &= 248;
             scalar_bytes[31] &= 127;
             scalar_bytes[31] |= 64;
-            Scalar::from_bits(scalar_bytes)
+            Scalar::from_bytes_mod_order(scalar_bytes)
         };
 
         // Extract and cache the high half.
@@ -111,7 +111,7 @@ impl From<[u8; 32]> for SigningKey {
         };
 
         // Compute the public key as A = [s]B.
-        let A = &s * &constants::ED25519_BASEPOINT_TABLE;
+        let A = ED25519_BASEPOINT_TABLE * &s;
 
         SigningKey {
             seed,
@@ -160,9 +160,7 @@ impl SigningKey {
     pub fn sign(&self, msg: &[u8]) -> Signature {
         let r = Scalar::from_hash(Sha512::default().chain(&self.prefix[..]).chain(msg));
 
-        let R_bytes = (&r * &constants::ED25519_BASEPOINT_TABLE)
-            .compress()
-            .to_bytes();
+        let R_bytes = (ED25519_BASEPOINT_TABLE * &r).compress().to_bytes();
 
         let k = Scalar::from_hash(
             Sha512::default()

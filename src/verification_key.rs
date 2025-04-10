@@ -1,11 +1,12 @@
 use core::convert::{TryFrom, TryInto};
 
 use curve25519_dalek::{
+    digest::Update,
     edwards::{CompressedEdwardsY, EdwardsPoint},
     scalar::Scalar,
     traits::IsIdentity,
 };
-use sha2::{Digest, Sha512};
+use sha2::Sha512;
 
 use crate::{Error, Signature};
 
@@ -50,7 +51,7 @@ impl VerificationKeyBytes {
 impl core::fmt::Debug for VerificationKeyBytes {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
         fmt.debug_tuple("VerificationKeyBytes")
-            .field(&hex::encode(&self.0))
+            .field(&hex::encode(self.0))
             .finish()
     }
 }
@@ -134,7 +135,7 @@ impl core::hash::Hash for VerificationKey {
 impl core::fmt::Debug for VerificationKey {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
         fmt.debug_tuple("VerificationKey")
-            .field(&hex::encode(&self.A_bytes.0))
+            .field(&hex::encode(self.A_bytes.0))
             .finish()
     }
 }
@@ -237,7 +238,9 @@ impl VerificationKey {
     #[allow(non_snake_case)]
     pub(crate) fn verify_prehashed(&self, signature: &Signature, k: Scalar) -> Result<(), Error> {
         // `s_bytes` MUST represent an integer less than the prime `l`.
-        let s = Scalar::from_canonical_bytes(signature.s_bytes).ok_or(Error::InvalidSignature)?;
+        let s = Scalar::from_canonical_bytes(signature.s_bytes)
+            .into_option()
+            .ok_or(Error::InvalidSignature)?;
         // `R_bytes` MUST be an encoding of a point on the twisted Edwards form of Curve25519.
         let R = CompressedEdwardsY(signature.R_bytes)
             .decompress()
